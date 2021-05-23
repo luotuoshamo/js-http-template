@@ -1,12 +1,36 @@
-let JsHttpTemplate = new Object()
-HttpSender100.get = get;
-HttpSender100.postFormData = postFormData;
-HttpSender100.postFormUrlEncoded = postFormUrlEncoded;
-HttpSender100.postJson = postJson;
-HttpSender100.postXml = postXml;
+const version = "1.0.0"
+const DEBUG = true
+const DEFAULT_CHARSET = "UTF-8"
 
-const DEFAULT_CHARSET = "UTF-8";
+let HttpTemplate = new Object()
 
+// 同步请求
+HttpTemplate.get = get
+HttpTemplate.postFormData = postFormData
+HttpTemplate.postFormUrlEncoded = postFormUrlEncoded
+HttpTemplate.postJson = postJson
+HttpTemplate.postXml = postXml
+
+// 异步请求
+// JsHttpTemplate.get = getAsync
+// JsHttpTemplate.postFormData = postFormDataAsync
+// JsHttpTemplate.postFormUrlEncoded = postFormUrlEncodedAsync
+// JsHttpTemplate.postJson = postJsonAsync
+// JsHttpTemplate.postXml = postXmlAsync
+
+// 工具
+HttpTemplate.getQueryParam = getQueryParam
+
+
+// ==================== 同步请求 ====================
+
+/**
+ * 发get同步请求
+ * @param url {string}
+ * @param headObj {object} 请求头
+ * @param  {object} 文本参数
+ * @return {responseURL:xx, responseText:xx, status:xx} status是状态码
+ */
 function get(url, headObj, textParamObj) {
     let method = "GET";
     let charset = getCharsetFromHeadObj(headObj);
@@ -33,6 +57,14 @@ function get(url, headObj, textParamObj) {
     return resObj
 }
 
+/**
+ * 发post请求，请求体时form-data
+ * @param url {string}
+ * @param headObj {object} 请求头
+ * @param textParamObj {object} 文本参数
+ * @param binaryParamObj {object} 二进制参数
+ * @return {responseURL:xx, responseText:xx, status:xx} status是状态码
+ */
 function postFormData(url, headObj, textParamObj, binaryParamObj) {
     let method = "POST";
     let bodyType = "form-data";
@@ -59,6 +91,13 @@ function postFormData(url, headObj, textParamObj, binaryParamObj) {
     return resObj
 }
 
+/**
+ * 发post请求，请求体是form-url-encoded
+ * @param url {string}
+ * @param headObj {object} 请求头
+ * @param textParamObj {object} 文本参数
+ * @return {responseURL:xx, responseText:xx, status:xx} status是状态码
+ */
 function postFormUrlEncoded(url, headObj, textParamObj) {
     let method = "POST";
     let bodyType = "x-www-form-urlencoded";
@@ -82,13 +121,30 @@ function postFormUrlEncoded(url, headObj, textParamObj) {
     return resObj
 }
 
+/**
+ * 发post请求，请求体是json
+ * @param url {string}
+ * @param headObj {object} 请求头
+ * @param jsonString {string} json参数
+ * @return {responseURL:xx, responseText:xx, status:xx} status是状态码
+ */
 function postJson(url, headObj, jsonString) {
     return postRow(url, "application/json", headObj, jsonString)
 }
 
+/**
+ * 发post请求，请求体是xml
+ * @param url {string}
+ * @param headObj
+ * @param xmlString {string} xml参数
+ * @return {responseURL:xx, responseText:xx, status:xx} status是状态码
+ */
 function postXml(url, headObj, xmlString) {
     return postRow(url, "application/xml", headObj, xmlString)
 }
+
+
+// ==================== 工具 ====================
 
 /**
  * @param bodyType json、xml
@@ -114,7 +170,6 @@ function postRow(url, bodyType, headObj, rowString) {
     return resObj
 }
 
-/////////////////////////////////////
 /**
  * 将Object转成queryString
  *
@@ -144,6 +199,7 @@ function setRequestHead(httpRequest, headObj) {
  * 记日志-请求的基本信息
  */
 function logRequestMeta(url, method, charset, bodyType, headObj) {
+    if (!DEBUG) return
     console.log("=====请求开始=====");
     console.log("==request meta: ");
     console.log("url", url);
@@ -156,6 +212,7 @@ function logRequestMeta(url, method, charset, bodyType, headObj) {
  * 记日志-请求参数
  */
 function logRequestParam(textParamObj, binaryParamObj, row) {
+    if (!DEBUG) return
     console.log("==request param: ");
     console.log("textParamObj", textParamObj);
     console.log("binaryParamObj", binaryParamObj);
@@ -166,6 +223,7 @@ function logRequestParam(textParamObj, binaryParamObj, row) {
  * 记日志-响应
  */
 function logResponse(resObj) {
+    if (!DEBUG) return
     console.log("==response: ");
     console.log("resObj", resObj);
     console.log("=====请求结束=====")
@@ -173,18 +231,20 @@ function logResponse(resObj) {
 
 /**
  * 封装响应
+ * @param httpRequest {XMLHttpRequest}
  */
 function packResponse(httpRequest) {
     return {
         status: httpRequest.status,
-        responseText: httpRequest.responseText
+        responseText: httpRequest.responseText,
+        responseURL: httpRequest.responseURL
     }
 }
 
 /**
  * 从headObj中获取charset，如果没有获取到返回UTF-8
- * 就是从content-type中提取charset
- * 例如：content-type=application/json;charset=UTF-8
+ * 就是从请求头或响应头的content-type中提取charset
+ * @param headObj 请求头或响应头，例如：{content-length:10256,content-type=application/json;charset=UTF-8}
  */
 function getCharsetFromHeadObj(headObj) {
     if (!headObj || headObj.length == 0) return DEFAULT_CHARSET;
@@ -197,4 +257,24 @@ function getCharsetFromHeadObj(headObj) {
         }
     }
     return DEFAULT_CHARSET
+}
+
+/**
+ * 从地址中获取参数
+ * www.jd.com?name=1&age=2
+ * @param k 参数名，例如上例中的name和age
+ * @param href 如果不传则取当前地址栏的url
+ */
+function getQueryParam(k, href) {
+    let param = {}
+    if (!href) href = window.location.href
+    if (href.indexOf("?") == -1) return null
+    let paramString = href.substring(href.indexOf("?") + 1)
+    let paramPairs = paramString.split("&")//name=1
+    for (let i = 0; i < paramPairs.length; i++) {
+        let paramPair = paramPairs[i]
+        let kv = paramPair.split("=")
+        param[kv[0]] = kv[1]
+    }
+    return param[k]
 }
